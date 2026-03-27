@@ -177,6 +177,11 @@ CUSTOM_CSS = """
     margin-bottom: 0.3rem;
 }
 
+/* ---- Hide chat toolbar (copy/like buttons on hover) ---- */
+[data-testid="stChatMessageActionButtons"] {
+    display: none !important;
+}
+
 /* ---- Chat messages ---- */
 [data-testid="stChatMessage"] {
     background: transparent !important;
@@ -407,6 +412,8 @@ if "correction_count" not in st.session_state:
     st.session_state.correction_count = 0
 if "last_audio_hash" not in st.session_state:
     st.session_state.last_audio_hash = None
+if "audio_key" not in st.session_state:
+    st.session_state.audio_key = 0
 
 # ==========================================
 # PAGE RENDER
@@ -440,6 +447,7 @@ with col_clear:
         st.session_state.gemini_history = []
         st.session_state.correction_count = 0
         st.session_state.last_audio_hash = None
+        st.session_state.audio_key += 1
         st.rerun()
 
 # -- Chat area --
@@ -507,7 +515,7 @@ st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 tab_voice, tab_text = st.tabs(["🎤 Voice", "⌨️ Type"])
 
 with tab_voice:
-    audio_value = st.audio_input("Tap the mic and speak in English")
+    audio_value = st.audio_input("Tap the mic and speak in English", key=f"audio_{st.session_state.audio_key}")
 
 with tab_text:
     with st.form("text_input_form", clear_on_submit=True):
@@ -535,6 +543,7 @@ if audio_value is not None:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
         if user_text.strip():
+            st.session_state.audio_key += 1
             process_user_input(user_text)
 
 if submitted and text_input.strip():
