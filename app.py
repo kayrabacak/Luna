@@ -29,7 +29,6 @@ except (FileNotFoundError, KeyError):
     st.stop()
 
 client = OpenAI(api_key=OPENAI_API_KEY)
-google_client = genai.Client(api_key=GOOGLE_API_KEY)
 
 # ==========================================
 # SYSTEM INSTRUCTION
@@ -323,8 +322,24 @@ def speech_to_text(audio_file_path: str) -> str:
     return transcript.text
 
 
-def ask_gemini(chat_session, user_text: str) -> str:
-    return chat_session.send_message(user_text).text
+def ask_gemini(history: list, user_text: str) -> str:
+    """Create a fresh client each call — avoids Streamlit's httpx closed-client bug."""
+    fresh_client = genai.Client(api_key=GOOGLE_API_KEY)
+    contents = []
+    for msg in history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append(
+            types.Content(role=role, parts=[types.Part(text=msg["content"])])
+        )
+    contents.append(
+        types.Content(role="user", parts=[types.Part(text=user_text)])
+    )
+    response = fresh_client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=contents,
+        config=GEMINI_CONFIG,
+    )
+    return response.text
 
 
 def text_to_speech(text: str) -> str:
@@ -361,10 +376,13 @@ def parse_response(text: str):
 
 def process_user_input(user_text: str):
     """Add user message, get Luna's response, update state, rerun."""
+    with st.spinner("Luna is thinking..."):
+        ai_text = ask_gemini(st.session_state.gemini_history, user_text)
+        st.session_state.gemini_history.append({"role": "user", "content": user_text})
+        st.session_state.gemini_history.append({"role": "model", "content": ai_text})
+
     st.session_state.messages.append({"role": "user", "content": user_text})
 
-    with st.spinner("Luna is thinking..."):
-        ai_text = ask_gemini(st.session_state.chat_session, user_text)
         feedback, conversation = parse_response(ai_text)
         if feedback:
             st.session_state.correction_count += 1
@@ -385,11 +403,8 @@ def process_user_input(user_text: str):
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "chat_session" not in st.session_state:
-    st.session_state.chat_session = google_client.chats.create(
-        model="gemini-2.5-flash",
-        config=GEMINI_CONFIG,
-    )
+if "gemini_history" not in st.session_state:
+    st.session_state.gemini_history = []
 if "correction_count" not in st.session_state:
     st.session_state.correction_count = 0
 
@@ -422,10 +437,7 @@ with col_stats:
 with col_clear:
     if st.button("🗑️ Clear"):
         st.session_state.messages = []
-        st.session_state.chat_session = google_client.chats.create(
-                model="gemini-2.5-flash",
-                config=GEMINI_CONFIG,
-            )
+        st.session_state.gemini_history = []
         st.session_state.correction_count = 0
         st.rerun()
 
@@ -447,11 +459,12 @@ if not st.session_state.messages:
         if st.button("🚀 Start Conversation", use_container_width=True):
             with st.spinner("Luna is warming up..."):
                 first_text = ask_gemini(
-                    st.session_state.chat_session,
+                    [],
                     "Start our English practice conversation right now. "
                     "Open with something engaging, fun, and unexpected. "
                     "Do NOT ask about my day or how I am doing."
                 )
+                st.session_state.gemini_history.append({"role": "model", "content": first_text})
                 _, conversation = parse_response(first_text)
                 audio_path = text_to_speech(first_text)
             st.session_state.messages.append({
