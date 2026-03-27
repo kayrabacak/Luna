@@ -519,12 +519,3 @@ if audio_value:
 
 if submitted and text_input.strip():
     process_user_input(text_input.strip())
-s.append({
-        "role": "assistant", 
-        "content": ai_response_text, 
-        "audio": ai_audio_path
-    })
-
-    # Temizlik
-    if os.path.exists(tmp_audio_path):
-        os.remove(tmp_audio_path)
