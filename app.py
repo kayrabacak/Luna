@@ -378,16 +378,14 @@ def process_user_input(user_text: str):
     """Add user message, get Luna's response, update state, rerun."""
     with st.spinner("Luna is thinking..."):
         ai_text = ask_gemini(st.session_state.gemini_history, user_text)
-        st.session_state.gemini_history.append({"role": "user", "content": user_text})
-        st.session_state.gemini_history.append({"role": "model", "content": ai_text})
-
-    st.session_state.messages.append({"role": "user", "content": user_text})
-
         feedback, conversation = parse_response(ai_text)
         if feedback:
             st.session_state.correction_count += 1
         audio_path = text_to_speech(ai_text)
 
+    st.session_state.gemini_history.append({"role": "user", "content": user_text})
+    st.session_state.gemini_history.append({"role": "model", "content": ai_text})
+    st.session_state.messages.append({"role": "user", "content": user_text})
     st.session_state.messages.append({
         "role": "assistant",
         "content": ai_text,
