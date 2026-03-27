@@ -405,6 +405,8 @@ if "gemini_history" not in st.session_state:
     st.session_state.gemini_history = []
 if "correction_count" not in st.session_state:
     st.session_state.correction_count = 0
+if "last_audio_hash" not in st.session_state:
+    st.session_state.last_audio_hash = None
 
 # ==========================================
 # PAGE RENDER
@@ -437,6 +439,7 @@ with col_clear:
         st.session_state.messages = []
         st.session_state.gemini_history = []
         st.session_state.correction_count = 0
+        st.session_state.last_audio_hash = None
         st.rerun()
 
 # -- Chat area --
@@ -462,6 +465,7 @@ if not st.session_state.messages:
                     "Open with something engaging, fun, and unexpected. "
                     "Do NOT ask about my day or how I am doing."
                 )
+                st.session_state.gemini_history.append({"role": "user", "content": "Let's start our English practice conversation."})
                 st.session_state.gemini_history.append({"role": "model", "content": first_text})
                 _, conversation = parse_response(first_text)
                 audio_path = text_to_speech(first_text)
@@ -518,16 +522,20 @@ with tab_text:
             submitted = st.form_submit_button("Send", use_container_width=True)
 
 # -- Process inputs --
-if audio_value:
-    with st.spinner("🎙️ Transcribing your voice..."):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            tmp.write(audio_value.read())
-            tmp_path = tmp.name
-        user_text = speech_to_text(tmp_path)
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-    if user_text.strip():
-        process_user_input(user_text)
+if audio_value is not None:
+    audio_bytes = audio_value.getvalue()
+    audio_hash = hash(audio_bytes)
+    if audio_hash != st.session_state.last_audio_hash:
+        st.session_state.last_audio_hash = audio_hash
+        with st.spinner("🎙️ Transcribing your voice..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            user_text = speech_to_text(tmp_path)
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        if user_text.strip():
+            process_user_input(user_text)
 
 if submitted and text_input.strip():
     process_user_input(text_input.strip())
