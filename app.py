@@ -3,7 +3,7 @@ import os
 from openai import OpenAI
 from google import genai
 from google.genai import types
-import temp
+import tempfile
 import re
 
 # ==========================================
@@ -29,7 +29,7 @@ except (FileNotFoundError, KeyError):
     st.stop()
 
 client = OpenAI(api_key=OPENAI_API_KEY)
-genai.configure(api_key=GOOGLE_API_KEY)
+google_client = genai.Client(api_key=GOOGLE_API_KEY)
 
 # ==========================================
 # SYSTEM INSTRUCTION
@@ -65,16 +65,11 @@ Your goal is to make English practice feel like chatting with a cool friend — 
 - Be warm and celebratory when the user expresses themselves well
 """
 
-generation_config = {
-    "temperature": 0.85,
-    "top_p": 0.95,
-    "max_output_tokens": 1024,
-}
-
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",
-    generation_config=generation_config,
+GEMINI_CONFIG = types.GenerateContentConfig(
     system_instruction=SYSTEM_INSTRUCTION,
+    temperature=0.85,
+    top_p=0.95,
+    max_output_tokens=1024,
 )
 
 # ==========================================
@@ -391,7 +386,10 @@ def process_user_input(user_text: str):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "chat_session" not in st.session_state:
-    st.session_state.chat_session = model.start_chat(history=[])
+    st.session_state.chat_session = google_client.chats.create(
+        model="gemini-2.5-flash",
+        config=GEMINI_CONFIG,
+    )
 if "correction_count" not in st.session_state:
     st.session_state.correction_count = 0
 
@@ -424,7 +422,10 @@ with col_stats:
 with col_clear:
     if st.button("🗑️ Clear"):
         st.session_state.messages = []
-        st.session_state.chat_session = model.start_chat(history=[])
+        st.session_state.chat_session = google_client.chats.create(
+                model="gemini-2.5-flash",
+                config=GEMINI_CONFIG,
+            )
         st.session_state.correction_count = 0
         st.rerun()
 
